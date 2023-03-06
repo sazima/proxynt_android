@@ -5,6 +5,8 @@ import android.content.SharedPreferences;
 import android.databinding.tool.util.StringUtils;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Message;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -13,6 +15,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -37,6 +40,21 @@ public class MainActivity extends AppCompatActivity {
     private boolean isStartConnect = false;
     JWebSocketClient client;
     private final String jsonkey = "c_json";
+    private final Integer connectFailFlag = 1;
+
+    private  Handler mHandler = new Handler(){
+        @Override
+        public void handleMessage(@NonNull Message msg) {
+            Button mButton = (Button) findViewById(R.id.button_first);
+            System.out.println("-----------" + msg );
+            if (msg.what == connectFailFlag) {
+                showDialog("连接失败", "错误");
+                mButton.setText("connect");
+                isStartConnect = false;
+                mButton.setEnabled(true);
+            }
+        }
+    };
 
     @RequiresApi(api = Build.VERSION_CODES.N)
     @Override
@@ -50,14 +68,15 @@ public class MainActivity extends AppCompatActivity {
         NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration);
 
         String oldJson = readString(jsonkey);
-        EditText textArea = (EditText)findViewById( R.id.jsonTextArea);
+        EditText textArea = (EditText) findViewById(R.id.jsonTextArea);
         textArea.setText(oldJson);
 
         findViewById(R.id.button_first).setOnClickListener(new View.OnClickListener() {
 
             @Override
             public void onClick(View view) {
-                Button mButton = (Button)findViewById(R.id.button_first);
+
+                Button mButton = (Button) findViewById(R.id.button_first);
                 mButton.setEnabled(false);
                 if (isStartConnect) { // 改成暂停
                     client.close();
@@ -66,13 +85,13 @@ public class MainActivity extends AppCompatActivity {
                     mButton.setEnabled(true);
                     return;
                 }
-                EditText jsonTextArea = (EditText)findViewById( R.id.jsonTextArea);
+                EditText jsonTextArea = (EditText) findViewById(R.id.jsonTextArea);
                 String jsonString = jsonTextArea.getText().toString();
                 if (!StringUtils.isNotBlank(jsonString)) {
                     showDialog("请输入配置json", "错误");
                     return;
                 }
-                ClientConfigEntity clientConfigEntity ;
+                ClientConfigEntity clientConfigEntity;
                 Gson gson = new Gson();
                 try {
                     clientConfigEntity = gson.fromJson(jsonString, ClientConfigEntity.class);
@@ -86,7 +105,7 @@ public class MainActivity extends AppCompatActivity {
                 mButton.setText("disconnect");
                 String url = "";
                 ClientConfigEntity.Server server = clientConfigEntity.getServer();
-                url += server.isHttps()  ? "wss://" : "ws://";
+                url += server.isHttps() ? "wss://" : "ws://";
                 url += server.getHost() + ":" + server.getPort() + server.getPath();
                 new TableEncrypt().initTable(server.getPassword());
                 URI uri = URI.create(url);
@@ -94,7 +113,7 @@ public class MainActivity extends AppCompatActivity {
                 t.uri = uri;
                 new Thread(t).start();
                 mButton.setEnabled(true);
-                return ;
+                return;
             }
 
         });
@@ -125,7 +144,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void showDialog(String msg, String title) {
-        AlertDialog dialog=new AlertDialog.Builder(this)
+        AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(title)//设置标题
                 .setMessage(msg)//设置要显示的内容
                 .setNegativeButton("取消", new DialogInterface.OnClickListener() {
@@ -151,6 +170,7 @@ public class MainActivity extends AppCompatActivity {
      */
     class Thread1 implements Runnable {
         public URI uri;
+
         @RequiresApi(api = Build.VERSION_CODES.N)
         public synchronized void run() {
             connectOtherThread(uri);
@@ -158,21 +178,26 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @RequiresApi(api = Build.VERSION_CODES.N)
-    private void connectOtherThread(URI uri ) {
-        client = new JWebSocketClient(uri) { };
+    private void connectOtherThread(URI uri) {
+        client = new JWebSocketClient(uri) {
+        };
         try {
-            client.connect();
-        } catch ( Exception e) {
-            showDialog("连接错误" + e.getMessage(), "错误");
+            client.connectBlocking();
+        } catch (Exception e) {
+            Message message = new Message();
+            message.what = connectFailFlag;
+            mHandler.sendMessage(message);
+            isStartConnect = false;
+            return;
         }
-        if (client.isOpen()) {
-            try {
-                showDialog("连接失败: " + uri.toURL(), "错误");
-            } catch (MalformedURLException e) {
-                e.printStackTrace();
-            }
+        if (!client.isOpen()) {
+            isStartConnect = false;
+            Message message = new Message();
+            message.what = connectFailFlag;
+            mHandler.sendMessage(message);
+            return;
         }
-        while (isStartConnect){
+        while (isStartConnect) {
             if (!client.isOpen()) {
                 Log.i("reconnect", "reconnect");
                 try {
@@ -192,6 +217,8 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     }
+
+
     public void writeString(String KEY, String content) {
         SharedPreferences settings = getApplicationContext().getSharedPreferences(KEY, 0);
         SharedPreferences.Editor editor = settings.edit();
