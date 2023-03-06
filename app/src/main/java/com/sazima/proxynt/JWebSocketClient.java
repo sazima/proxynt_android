@@ -8,6 +8,7 @@ import androidx.annotation.RequiresApi;
 import com.sazima.proxynt.cilent.TcpForwardClient;
 import com.sazima.proxynt.common.SeriallizerUtils;
 import com.sazima.proxynt.constant.MessageTypeConstant;
+import com.sazima.proxynt.entity.ClientConfigEntity;
 import com.sazima.proxynt.entity.MessageEntity;
 import com.sazima.proxynt.entity.PushConfigEntity;
 import com.sazima.proxynt.entity.TcpOverWebsocketMessage;
@@ -25,8 +26,11 @@ import java.util.ArrayList;
 
 public class JWebSocketClient extends WebSocketClient {
     TcpForwardClient tcpForwardClient;
-    public JWebSocketClient(URI serverUri) {
+    public ClientConfigEntity configEntity;
+
+    public JWebSocketClient(URI serverUri, ClientConfigEntity clientConfigEntity) {
         super(serverUri, new Draft_6455());
+        this.configEntity = clientConfigEntity;
     }
 
     @Override
@@ -45,12 +49,12 @@ public class JWebSocketClient extends WebSocketClient {
             tcpForwardClient.start();
             PushConfigEntity pushConfigEntity = new PushConfigEntity();
             pushConfigEntity.setConfig_list(new ArrayList<>());
-            pushConfigEntity.setClient_name("android");
-            pushConfigEntity.setVersion("1.1.11");
-            pushConfigEntity.setKey("hello world");
+            pushConfigEntity.setClient_name(configEntity.getClient_name());
+//            pushConfigEntity.setVersion("");
+            pushConfigEntity.setKey(configEntity.getServer().getPassword());
             MessageEntity<PushConfigEntity> objectMessageEntity = new MessageEntity<>();
             objectMessageEntity.setData(pushConfigEntity);
-            objectMessageEntity.setType_("1");
+            objectMessageEntity.setType_(MessageTypeConstant.PUSH_CONFIG);
             byte[] dumps = new SeriallizerUtils().dumps(objectMessageEntity);
             send(dumps);
         } catch ( Exception e) {

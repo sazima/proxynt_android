@@ -26,6 +26,7 @@ import androidx.navigation.ui.NavigationUI;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
+import com.sazima.proxynt.common.SeriallizerUtils;
 import com.sazima.proxynt.common.TableEncrypt;
 import com.sazima.proxynt.databinding.ActivityMainBinding;
 import com.sazima.proxynt.entity.ClientConfigEntity;
@@ -108,9 +109,11 @@ public class MainActivity extends AppCompatActivity {
                 url += server.isHttps() ? "wss://" : "ws://";
                 url += server.getHost() + ":" + server.getPort() + server.getPath();
                 new TableEncrypt().initTable(server.getPassword());
+                SeriallizerUtils.key = server.getPassword();//# todo?
                 URI uri = URI.create(url);
                 Thread1 t = new Thread1();
                 t.uri = uri;
+                t.clientConfigEntity = clientConfigEntity;
                 new Thread(t).start();
                 mButton.setEnabled(true);
                 return;
@@ -170,16 +173,17 @@ public class MainActivity extends AppCompatActivity {
      */
     class Thread1 implements Runnable {
         public URI uri;
+        public ClientConfigEntity clientConfigEntity;
 
         @RequiresApi(api = Build.VERSION_CODES.N)
         public synchronized void run() {
-            connectOtherThread(uri);
+            connectOtherThread(uri, clientConfigEntity);
         }
     }
 
     @RequiresApi(api = Build.VERSION_CODES.N)
-    private void connectOtherThread(URI uri) {
-        client = new JWebSocketClient(uri) {
+    private void connectOtherThread(URI uri, ClientConfigEntity clientConfigEntity) {
+        client = new JWebSocketClient(uri, clientConfigEntity) {
         };
         try {
             client.connectBlocking();

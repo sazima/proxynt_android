@@ -18,6 +18,7 @@ import java.lang.reflect.Type;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Date;
@@ -27,6 +28,7 @@ import java.util.Random;
 public class SeriallizerUtils {
     private final Integer HEADER_LEN = 38;
     private final Integer UID_LEN = 4;
+    public static String key;
 
     @RequiresApi(api = Build.VERSION_CODES.O)
     public MessageEntity loads(byte[] bytes) throws NoSuchAlgorithmException, IOException {
@@ -131,13 +133,24 @@ public class SeriallizerUtils {
         byte[] nonce = new byte[5];
         new Random().nextBytes(nonce);
         byte[] timestamp = unsignIntToByteArray((int) new Date().getTime());
-        byte[] hash = new byte[16];
         byte[] empty = new byte[8];
         ByteArrayOutputStream returnMessage = new ByteArrayOutputStream();
         returnMessage.write(type_.getBytes());
         returnMessage.write(unsignIntToByteArray(bodyLen));
         returnMessage.write(nonce);
         returnMessage.write(timestamp);
+//        byte[] hash = new byte[16];
+        ByteArrayOutputStream needSashSteam = new ByteArrayOutputStream();
+        needSashSteam.write(nonce);
+        byte[] bodyPrefix = new byte[12];
+        System.arraycopy(body, 0, bodyPrefix, 0, 12);
+        needSashSteam.write(timestamp);
+        needSashSteam.write(bodyPrefix);
+        needSashSteam.write(key.getBytes());
+//        signature = EncryptUtils.md5_hash(nonce + timestamp + body[:12] + key.getBytes()
+        byte[] hash = getMd5(needSashSteam.toByteArray());
+//        new EncryptUtils().
+//                k
         returnMessage.write(hash);
         returnMessage.write(empty);
         returnMessage.write(body);
@@ -183,5 +196,15 @@ public class SeriallizerUtils {
         return (int) b[0];
     }
 
+    private byte[] getMd5(byte[] bytesOfMessage) {
+//        byte[] bytesOfMessage = yourString.getBytes();
+        MessageDigest md = null;
+        try {
+            md = MessageDigest.getInstance("MD5");
+        } catch (NoSuchAlgorithmException e) {
+            throw new RuntimeException(e);
+        }
+        return md.digest(bytesOfMessage);
+    }
 
 }
