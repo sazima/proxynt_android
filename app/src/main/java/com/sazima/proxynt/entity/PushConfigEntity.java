@@ -2,7 +2,6 @@ package com.sazima.proxynt.entity;
 
 import java.util.List;
 
-import lombok.Data;
 
 public class PushConfigEntity {
     public  static class ClientData{

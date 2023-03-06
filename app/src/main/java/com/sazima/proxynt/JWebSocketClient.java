@@ -1,6 +1,9 @@
 package com.sazima.proxynt;
 
+import android.os.Build;
 import android.util.Log;
+
+import androidx.annotation.RequiresApi;
 
 import com.sazima.proxynt.cilent.TcpForwardClient;
 import com.sazima.proxynt.common.SeriallizerUtils;
@@ -27,34 +30,33 @@ public class JWebSocketClient extends WebSocketClient {
     }
 
     @Override
-    public void onOpen(ServerHandshake handshakedata) {
-        tcpForwardClient = new TcpForwardClient();
-        tcpForwardClient.setWebSocketClient(this);
-        try {
-            tcpForwardClient.start();
-        } catch (IOException e) {
-            e.printStackTrace();
-            return;
-        }
+    public void send(byte[] data) {
+        super.send(data);
+    }
 
-        PushConfigEntity pushConfigEntity = new PushConfigEntity();
-        pushConfigEntity.setConfig_list(new ArrayList<>());
-        pushConfigEntity.setClient_name("android");
-        pushConfigEntity.setVersion("1.1.11");
-        pushConfigEntity.setKey("helloworld");
-        MessageEntity<PushConfigEntity> objectMessageEntity = new MessageEntity<>();
-        objectMessageEntity.setData(pushConfigEntity);
-        objectMessageEntity.setType_("1");
+    @RequiresApi(api = Build.VERSION_CODES.N)
+    @Override
+    public void onOpen(ServerHandshake handshakedata) {
         try {
+            tcpForwardClient = new TcpForwardClient();
+            tcpForwardClient.setWebSocketClient(this);
+            Log.i("openopen", "open--------------------");
+            System.out.println("open open");
+            tcpForwardClient.start();
+            PushConfigEntity pushConfigEntity = new PushConfigEntity();
+            pushConfigEntity.setConfig_list(new ArrayList<>());
+            pushConfigEntity.setClient_name("android");
+            pushConfigEntity.setVersion("1.1.11");
+            pushConfigEntity.setKey("hello world");
+            MessageEntity<PushConfigEntity> objectMessageEntity = new MessageEntity<>();
+            objectMessageEntity.setData(pushConfigEntity);
+            objectMessageEntity.setType_("1");
             byte[] dumps = new SeriallizerUtils().dumps(objectMessageEntity);
             send(dumps);
-        } catch (NoSuchAlgorithmException e) {
+        } catch ( Exception e) {
             e.printStackTrace();
-        } catch (IOException e) {
-            e.printStackTrace();
+            Log.e("JWebSocketClient", "onOpen()");
         }
-
-        Log.e("JWebSocketClient", "onOpen()");
     }
 
     @Override
@@ -62,6 +64,7 @@ public class JWebSocketClient extends WebSocketClient {
     }
 
 //    @Override
+    @RequiresApi(api = Build.VERSION_CODES.O)
     public void onMessage(ByteBuffer buff){
         byte[] array = buff.array();
         try {
@@ -89,7 +92,6 @@ public class JWebSocketClient extends WebSocketClient {
                     if (data1.getData() == null) {
                         Log.e("e", "data1 is null");
                     }
-//                    tcpForwardClient.createSocket(data1.getName(), data1.getUid(), data.getIp_port());
                     tcpForwardClient.sendByUid( data1.getUid(), ByteBuffer.wrap(data1.getData()));
                     break;
             }
@@ -104,12 +106,19 @@ public class JWebSocketClient extends WebSocketClient {
 
     @Override
     public void onClose(int code, String reason, boolean remote) {
-        connect();
         Log.e("JWebSocketClient", "onClose()");
     }
 
     @Override
     public void onError(Exception ex) {
-        Log.e("error", ex.getMessage());
+        try {
+
+            Log.e("error", ex.getMessage());
+        } catch ( Exception e) {
+            e.printStackTrace();
+        }
     }
+
+
+
 }

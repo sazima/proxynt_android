@@ -1,6 +1,9 @@
 package com.sazima.proxynt.common;
 
+import android.os.Build;
 import android.util.Log;
+
+import androidx.annotation.RequiresApi;
 
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
@@ -25,51 +28,54 @@ public class SeriallizerUtils {
     private final Integer HEADER_LEN = 38;
     private final Integer UID_LEN = 4;
 
+    @RequiresApi(api = Build.VERSION_CODES.O)
     public MessageEntity loads(byte[] bytes) throws NoSuchAlgorithmException, IOException {
+        bytes = new EncryptUtils().decrypt(bytes);
         byte[] type = new byte[1];
         byte[] bodyLen = new byte[4];
         System.arraycopy(bytes, 0, type, 0, 1);
         String typeString = new String(type);
         System.arraycopy(bytes, 1, bodyLen, 0, 4);
-        int bodyLenInt = byteArrayToLeUnsignInt(bodyLen);
-        byte[] bodyBytes = new byte[bodyLenInt];
+        long bodyLenInt = byteArrayToLeUnsignInt(bodyLen);
         MessageEntity messageEntity = null;
-        System.arraycopy(bytes, HEADER_LEN, bodyBytes, 0, bodyLenInt);
-        if (typeString.equals(MessageTypeConstant.PUSH_CONFIG)) {
-            Gson gson = new Gson();
-            String str = new String(bodyBytes);
-            messageEntity = gson.fromJson(str, MessageEntity.class);
-            messageEntity = new Gson().fromJson(str, new TypeToken<MessageEntity<PushConfigEntity>>() {
-            }.getType());
-            String a = "";
+        byte[] bodyBytes;
 
-//            List<PushConfigEntity> data = (List<PushConfigEntity>) (Object)messageEntity.getData();
-//            messageEntity.setData(data);
-        } else if (typeString.equals(MessageTypeConstant.WEBSOCKET_OVER_TCP) || typeString.equals(MessageTypeConstant.REQUEST_TO_CONNECT)) {
-            int start = 0;
-            byte[] lenName = new byte[1];
-            byte[] lenIpPort = new byte[1];
-            byte[] lenBytes = new byte[4];
-            try {
+        switch (typeString) {
+            case MessageTypeConstant.PUSH_CONFIG:
+                bodyBytes = new byte[(int) bodyLenInt];
+                System.arraycopy(bytes, HEADER_LEN, bodyBytes, 0, (int) bodyLenInt);
+                Gson gson = new Gson();
+                String str = new String(bodyBytes);
+                messageEntity = new Gson().fromJson(str, new TypeToken<MessageEntity<PushConfigEntity>>() {
+                }.getType());
+                break;
+            case MessageTypeConstant.WEBSOCKET_OVER_TCP:
+            case MessageTypeConstant.REQUEST_TO_CONNECT:
+                bodyBytes = new byte[(int) bodyLenInt];
+                System.arraycopy(bytes, HEADER_LEN, bodyBytes, 0, (int) bodyLenInt);
+                int start = 0;
+                byte[] lenName = new byte[1];
+                byte[] lenIpPort = new byte[1];
+                byte[] lenBytes = new byte[4];
                 System.arraycopy(bodyBytes, 0, lenName, 0, 1);
                 System.arraycopy(bodyBytes, 1, lenIpPort, 0, 1);
                 System.arraycopy(bodyBytes, 4, lenBytes, 0, 4);
 
                 start += 8;
-                int lenNameInt = byteArrayToLeUnsignChar(lenName);
-                int lenIpPortInt = byteArrayToLeUnsignChar(lenIpPort);
-                int lenBytesInt = byteArrayToLeUnsignInt(lenBytes);
+                int lenNameInt = Byte.toUnsignedInt(lenName[0]);
+                int lenIpPortInt = Byte.toUnsignedInt(lenIpPort[0]);
+                long lenBytesInt = TypeConversion.bytesToUInt32(lenBytes, 0);
                 byte[] uid = new byte[UID_LEN];
                 byte[] name = new byte[lenNameInt];
                 byte[] ipPort = new byte[lenIpPortInt];
-                byte[] socketData = new byte[lenBytesInt];
+                byte[] socketData = new byte[(int) lenBytesInt];
                 System.arraycopy(bodyBytes, start, uid, 0, UID_LEN);
                 start += UID_LEN;
                 System.arraycopy(bodyBytes, start, name, 0, lenNameInt);
                 start += lenNameInt;
                 System.arraycopy(bodyBytes, start, ipPort, 0, lenIpPortInt);
                 start += lenIpPortInt;
-                System.arraycopy(bodyBytes, start, socketData, 0, lenBytesInt);
+                System.arraycopy(bodyBytes, start, socketData, 0, (int) lenBytesInt);
                 start += lenBytesInt;
                 TcpOverWebsocketMessage tcpOverWebsocketMessage = new TcpOverWebsocketMessage();
                 tcpOverWebsocketMessage.setData(socketData);
@@ -82,23 +88,24 @@ public class SeriallizerUtils {
                 messageEntity = new MessageEntity<>();
                 messageEntity.setType_(typeString);
                 messageEntity.setData(tcpOverWebsocketMessage);
-                return messageEntity;
-//                messageEntity.setData(messageMessageEntity);
-            } catch (Exception e) {
-                e.printStackTrace();
-                return null;
-            }
-        } else if (typeString.equals(MessageTypeConstant.PING)) {
-            messageEntity = new MessageEntity<>();
-            messageEntity.setType_(typeString);
-            messageEntity.setData(null);
+                break;
+
+            case MessageTypeConstant.PING:
+                bodyBytes = new byte[(int) bodyLenInt];
+                System.arraycopy(bytes, HEADER_LEN, bodyBytes, 0, (int) bodyLenInt);
+                messageEntity = new MessageEntity<>();
+                messageEntity.setType_(typeString);
+                messageEntity.setData(null);
+                break;
         }
 
         return messageEntity;
     }
 
+    @RequiresApi(api = Build.VERSION_CODES.N)
     public byte[] dumps(MessageEntity messageEntity) throws NoSuchAlgorithmException, IOException {
         String type_ = messageEntity.getType_();
+        Log.i("dumps", messageEntity.toString());
         byte[] body = new byte[5];
         if (type_.equals(MessageTypeConstant.PUSH_CONFIG) || type_.equals(MessageTypeConstant.PING)) {
             Gson gson = new Gson();
@@ -134,7 +141,18 @@ public class SeriallizerUtils {
         returnMessage.write(hash);
         returnMessage.write(empty);
         returnMessage.write(body);
-        return returnMessage.toByteArray();
+
+        Log.i("encrypt", "start encrypt");
+        try {
+//            byte[] bytes = new EncryptUtils().encrypt("hello world".getBytes());
+            byte[] bytes = new EncryptUtils().encrypt(returnMessage.toByteArray());
+            System.out.printf(String.valueOf(bytes));
+            Log.i("encrypt", "end encrypt");
+            return bytes;
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw e;
+        }
     }
 
 
@@ -143,8 +161,6 @@ public class SeriallizerUtils {
         bb.order(ByteOrder.LITTLE_ENDIAN);
         int int1 = bb.getInt();
         return int1;
-//        int uint = int1 & 0xFF;
-//        return uint;
     }
 
     private byte[] unsignIntToByteArray(int i) {
@@ -155,8 +171,7 @@ public class SeriallizerUtils {
     }
 
     private byte[] unsignCharToByteArray(int i) {
-        return new byte[] {
-                (byte)i};
+        return new byte[]{(byte) i};
 //        return
 //        ByteBuffer bb = ByteBuffer.allocate(1);
 //        bb.order(ByteOrder.LITTLE_ENDIAN);
@@ -166,15 +181,7 @@ public class SeriallizerUtils {
 
     private int byteArrayToLeUnsignChar(byte[] b) {
         return (int) b[0];
-//        final ByteBuffer bb = ByteBuffer.wrap(b);
-//        bb.order(ByteOrder.LITTLE_ENDIAN);
-//        return bb.getInt();
     }
 
 
-    public static void main(String[] args) {
-        SeriallizerUtils s = new SeriallizerUtils();
-        byte[] bytes = s.unsignIntToByteArray(1677860198);
-        System.out.printf("", bytes);
-    }
 }

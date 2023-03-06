@@ -53,17 +53,16 @@ public class TcpForwardClient {
 
     public void processMessage(SocketChannel socketChannel) {
         try {
-//            int receiveBufferSize = socketChannel.socket().get();
-//            Log.i("tcp forarwd", "size : " + receiveBufferSize);
             ByteBuffer buffer = ByteBuffer.allocate(10240);
             int read = socketChannel.read(buffer);
             Log.i("tcp forarwd", "size : " + read);
-
             byte[] allArrays = buffer.array();
-            byte[] realArrays = new byte[read];
-            System.arraycopy(allArrays, 0, realArrays, 0, read);
-
-
+            byte[] realArrays = new byte[0];
+            if(read == -1) {
+            } else {
+                realArrays = new byte[read];
+                System.arraycopy(allArrays, 0, realArrays, 0, read);
+            }
             TcpOverWebsocketMessage tcpOverWebsocketMessage = new TcpOverWebsocketMessage();
             ByteBuffer uidBuffer = socketToUid.get(socketChannel);
             String name = uidToName.get(uidBuffer);
@@ -78,7 +77,7 @@ public class TcpForwardClient {
             byte[] sendBytes = new SeriallizerUtils().dumps(messageMessageEntity);
             webSocketClient.send(sendBytes);
             Log.i("tcp forarwd", "send to websocket, len: " + sendBytes.length);
-        } catch (IOException | NoSuchAlgorithmException e) {
+        } catch (Exception e) {
             e.printStackTrace();
         }
 //        buffer.flip();
