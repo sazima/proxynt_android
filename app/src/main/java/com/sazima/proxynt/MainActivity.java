@@ -1,6 +1,8 @@
 package com.sazima.proxynt;
 
+import android.content.Context;
 import android.content.DialogInterface;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.databinding.tool.util.StringUtils;
 import android.os.Build;
@@ -11,6 +13,7 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
@@ -24,10 +27,12 @@ import androidx.navigation.Navigation;
 import androidx.navigation.ui.AppBarConfiguration;
 import androidx.navigation.ui.NavigationUI;
 
+import com.android.tools.r8.code.AputBoolean;
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
 import com.sazima.proxynt.common.SeriallizerUtils;
 import com.sazima.proxynt.common.TableEncrypt;
+import com.sazima.proxynt.common.YourService;
 import com.sazima.proxynt.databinding.ActivityMainBinding;
 import com.sazima.proxynt.entity.ClientConfigEntity;
 
@@ -38,29 +43,20 @@ public class MainActivity extends AppCompatActivity {
 
     private AppBarConfiguration appBarConfiguration;
     private ActivityMainBinding binding;
-    private boolean isStartConnect = false;
     JWebSocketClient client;
     private final String jsonkey = "c_json";
-    private final Integer connectFailFlag = 1;
+    private boolean isConnectButton = true;
 
-    private  Handler mHandler = new Handler(){
-        @Override
-        public void handleMessage(@NonNull Message msg) {
-            Button mButton = (Button) findViewById(R.id.button_first);
-            System.out.println("-----------" + msg );
-            if (msg.what == connectFailFlag) {
-                showDialog("连接失败", "错误");
-                mButton.setText("connect");
-                isStartConnect = false;
-                mButton.setEnabled(true);
-            }
-        }
-    };
+
 
     @RequiresApi(api = Build.VERSION_CODES.N)
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        startService(new Intent(this, YourService.class));
+
+        MyHandler.mainActivity = this;
+
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
         setSupportActionBar(binding.toolbar);
@@ -76,20 +72,21 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onClick(View view) {
-
                 Button mButton = (Button) findViewById(R.id.button_first);
                 mButton.setEnabled(false);
-                if (isStartConnect) { // 改成暂停
-                    client.close();
-                    mButton.setText("connect");
-                    isStartConnect = false;
-                    mButton.setEnabled(true);
+                InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
+                imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+                if (!isConnectButton) {
+                    Message message = new Message();
+                    message.what = MyHandler.ON_CLICK_DISCONNECT;
+                    MyHandler.handler.sendMessage(message);
                     return;
                 }
                 EditText jsonTextArea = (EditText) findViewById(R.id.jsonTextArea);
                 String jsonString = jsonTextArea.getText().toString();
                 if (!StringUtils.isNotBlank(jsonString)) {
                     showDialog("请输入配置json", "错误");
+                    mButton.setEnabled(true);
                     return;
                 }
                 ClientConfigEntity clientConfigEntity;
@@ -99,11 +96,11 @@ public class MainActivity extends AppCompatActivity {
                 } catch (JsonSyntaxException e) {
                     e.printStackTrace();
                     showDialog("请检查json格式", "错误");
+                    mButton.setEnabled(true);
                     return;
                 }
                 writeString(jsonkey, jsonString);
-                isStartConnect = true;
-                mButton.setText("disconnect");
+//                mButton.setText("disconnect");
                 String url = "";
                 ClientConfigEntity.Server server = clientConfigEntity.getServer();
                 url += server.isHttps() ? "wss://" : "ws://";
@@ -115,7 +112,6 @@ public class MainActivity extends AppCompatActivity {
                 t.uri = uri;
                 t.clientConfigEntity = clientConfigEntity;
                 new Thread(t).start();
-                mButton.setEnabled(true);
                 return;
             }
 
@@ -132,10 +128,6 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
-
-//            return true;
-//        }
-
         return super.onOptionsItemSelected(item);
     }
 
@@ -146,7 +138,7 @@ public class MainActivity extends AppCompatActivity {
                 || super.onSupportNavigateUp();
     }
 
-    private void showDialog(String msg, String title) {
+    public void showDialog(String msg, String title) {
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(title)//设置标题
                 .setMessage(msg)//设置要显示的内容
@@ -165,7 +157,6 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }).create();//create（）方法创建对话框
         dialog.show();//显示对话框
-
     }
 
     /*
@@ -177,48 +168,30 @@ public class MainActivity extends AppCompatActivity {
 
         @RequiresApi(api = Build.VERSION_CODES.N)
         public synchronized void run() {
-            connectOtherThread(uri, clientConfigEntity);
-        }
-    }
-
-    @RequiresApi(api = Build.VERSION_CODES.N)
-    private void connectOtherThread(URI uri, ClientConfigEntity clientConfigEntity) {
-        client = new JWebSocketClient(uri, clientConfigEntity) {
-        };
-        try {
-            client.connectBlocking();
-        } catch (Exception e) {
-            Message message = new Message();
-            message.what = connectFailFlag;
-            mHandler.sendMessage(message);
-            isStartConnect = false;
-            return;
-        }
-        if (!client.isOpen()) {
-            isStartConnect = false;
-            Message message = new Message();
-            message.what = connectFailFlag;
-            mHandler.sendMessage(message);
-            return;
-        }
-        while (isStartConnect) {
-            if (!client.isOpen()) {
-                Log.i("reconnect", "reconnect");
-                try {
-//                            client.close();
-                    client.reconnectBlocking();
-                    if (!isStartConnect) {
-                        client.close();
-                    }
-                } catch (Exception e) {
-                    e.printStackTrace();
-                }
-            }
+            client = new JWebSocketClient(uri, clientConfigEntity);
+            MyHandler.jWebSocketClient = client;
             try {
-                Thread.sleep(1000);
-            } catch (InterruptedException e) {
-                e.printStackTrace();
+                client.connectBlocking();
+            } catch (Exception e) {
+                Message message = new Message();
+                message.what = MyHandler.ON_WEBSOCKETCONNECT_ERROR;
+                message.obj = e.getMessage();
+                MyHandler.handler.sendMessage(message);
+                return;
             }
+            if (!client.isOpen()) {
+                Message message = new Message();
+                message.what = MyHandler.ON_WEBSOCKETCONNECT_ERROR;
+                message.obj = "client is not open";
+                MyHandler.handler.sendMessage(message);
+                return;
+            } else {
+                Message message = new Message();
+                message.what = MyHandler.ON_WEBSOCKETCONNECT_SUCCESS;
+                message.obj = "连接成功";
+                MyHandler.handler.sendMessage(message);
+            }
+//            connectOtherThread(uri, clientConfigEntity);
         }
     }
 
@@ -234,5 +207,15 @@ public class MainActivity extends AppCompatActivity {
         SharedPreferences settings = getApplicationContext().getSharedPreferences(KEY, 0);
         String homeScore = settings.getString("homeScore", "");
         return homeScore;
+    }
+    public void setButtonToClose() {
+        Button mButton = (Button) findViewById(R.id.button_first);
+        isConnectButton = false;
+        mButton.setText("断开");
+    }
+    public void setButtonToConnect() {
+        Button mButton = (Button) findViewById(R.id.button_first);
+        isConnectButton = true;
+        mButton.setText("连接");
     }
 }

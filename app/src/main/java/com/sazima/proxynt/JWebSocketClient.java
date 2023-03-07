@@ -1,6 +1,7 @@
 package com.sazima.proxynt;
 
 import android.os.Build;
+import android.os.Message;
 import android.util.Log;
 
 import androidx.annotation.RequiresApi;
@@ -42,7 +43,12 @@ public class JWebSocketClient extends WebSocketClient {
     @Override
     public void onOpen(ServerHandshake handshakedata) {
         try {
+            Message message = new Message();
+            message.what = MyHandler.ON_WEBSOCKET_OPEN;
+            message.obj = "websocket 连接成功, 正在发送数据";
+            MyHandler.handler.sendMessage(message);
             tcpForwardClient = new TcpForwardClient();
+
             tcpForwardClient.setWebSocketClient(this);
             Log.i("openopen", "open--------------------");
             System.out.println("open open");
@@ -50,7 +56,6 @@ public class JWebSocketClient extends WebSocketClient {
             PushConfigEntity pushConfigEntity = new PushConfigEntity();
             pushConfigEntity.setConfig_list(new ArrayList<>());
             pushConfigEntity.setClient_name(configEntity.getClient_name());
-//            pushConfigEntity.setVersion("");
             pushConfigEntity.setKey(configEntity.getServer().getPassword());
             MessageEntity<PushConfigEntity> objectMessageEntity = new MessageEntity<>();
             objectMessageEntity.setData(pushConfigEntity);
@@ -60,6 +65,10 @@ public class JWebSocketClient extends WebSocketClient {
         } catch ( Exception e) {
             e.printStackTrace();
             Log.e("JWebSocketClient", "onOpen()");
+            Message message1 = new Message();
+            message1.what = MyHandler.ON_WEBSOCKET_OPEN;
+            message1.obj = "websocket 发送数据错误: " + e.getMessage();
+            MyHandler.handler.sendMessage(message1);
         }
     }
 
@@ -73,7 +82,6 @@ public class JWebSocketClient extends WebSocketClient {
         byte[] array = buff.array();
         try {
             MessageEntity messageEntity = new SeriallizerUtils().loads(array);
-            Log.i("buffer-------------", messageEntity.toString());
             switch (messageEntity.getType_()){
                 case MessageTypeConstant.PING:
                     send(array);
@@ -85,6 +93,10 @@ public class JWebSocketClient extends WebSocketClient {
                     if (null == data) {
                         Log.e("e", "data is null");
                     }
+                    Message message1 = new Message();
+                    message1.what = MyHandler.ON_WEBSOCKET_OPEN;
+                    message1.obj = "start connect connect: " + data.getName();
+                    MyHandler.handler.sendMessage(message1);
                     tcpForwardClient.createSocket(data.getName(), data.getUid(), data.getIp_port());
                     break;
                 case MessageTypeConstant.WEBSOCKET_OVER_TCP:
@@ -111,6 +123,15 @@ public class JWebSocketClient extends WebSocketClient {
     @Override
     public void onClose(int code, String reason, boolean remote) {
         Log.e("JWebSocketClient", "onClose()");
+        Message message = new Message();
+        message.what = MyHandler.ON_CLOSE_WEBSOCKET;
+        message.obj = "websocket 断开, 正在重连";
+        try {
+            Thread.sleep(3000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        MyHandler.handler.sendMessage(message);
     }
 
     @Override

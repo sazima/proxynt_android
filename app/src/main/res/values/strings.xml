@@ -4,7 +4,7 @@
     <!-- Strings used for fragments for navigation -->
     <string name="first_fragment_label">proxynt</string>
     <string name="second_fragment_label">Second Fragment</string>
-    <string name="start">connect</string>
+    <string name="start">连接</string>
     <string name="stop">stop</string>
 
     <string name="hello_first_fragment">Hello first fragment</string>
