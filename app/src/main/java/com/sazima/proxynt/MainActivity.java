@@ -73,6 +73,11 @@ public class MainActivity extends AppCompatActivity {
         String oldJson = readString(JSONKEY);
         EditText textArea = (EditText) findViewById(R.id.jsonTextArea);
         textArea.setText(oldJson);
+//        findViewById(R.id.action_star).setOnClickListener(new View.OnClickListener() {
+//            @Override
+//            public void onClick(View v) {
+//            }
+//        });
 
         findViewById(R.id.button_first).setOnClickListener(new View.OnClickListener() {
 
@@ -131,11 +136,6 @@ public class MainActivity extends AppCompatActivity {
         return true;
     }
 
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        int id = item.getItemId();
-        return super.onOptionsItemSelected(item);
-    }
 
     @Override
     public boolean onSupportNavigateUp() {
@@ -269,5 +269,20 @@ public class MainActivity extends AppCompatActivity {
                 dialog.show();//显示对话框
             }
         }
+    }
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        int id = item.getItemId();
+        if (id == R.id.action_star) {
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(getString(R.string.github_url)));
+            startActivity(intent);
+//            getString()
+//            getResources().getString(R.string.);
+//            strin
+//            Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("http://www.google.com"));
+//            startActivity(browserIntent);
+//            return true;
+        }
+        return super.onOptionsItemSelected(item);
     }
 }
