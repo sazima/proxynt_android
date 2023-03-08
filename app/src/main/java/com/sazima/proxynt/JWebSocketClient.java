@@ -124,10 +124,10 @@ public class JWebSocketClient extends WebSocketClient {
     @Override
     public void onClose(int code, String reason, boolean remote) {
         tcpForwardClient.stop();
-        Log.e("JWebSocketClient", "onClose()");
+        Log.e("JWebSocketClient", "remote: " + remote);
         Message message = new Message();
         message.what = MyHandler.ON_CLOSE_WEBSOCKET;
-        message.obj = "websocket 断开, 正在重连";
+        message.obj = "websocket 断开, reason: " + reason + " ,正在重连";
         try {
             Thread.sleep(3000);
         } catch (InterruptedException e) {

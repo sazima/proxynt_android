@@ -6,6 +6,7 @@
     <string name="second_fragment_label">Second Fragment</string>
     <string name="start">连接</string>
     <string name="stop">stop</string>
+    <string name="helpText">输入客户端配置然后点击连接</string>
 
     <string name="github_url">https://github.com/sazima/proxynt_android</string>
 
