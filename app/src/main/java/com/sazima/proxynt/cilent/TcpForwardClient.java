@@ -26,6 +26,18 @@ public class TcpForwardClient {
     private SelectPool selectPool;
     private boolean isOpen = false;
 
+    public void stop(){
+        if (selectPool != null) {
+            try {
+                selectPool.stop();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+            uidToSocket.clear();
+            socketToUid.clear();
+            uidToSocket.clear();
+        }
+    }
     public boolean start() throws IOException {
         if (isOpen) {
             Log.i("tcp forward client", "already open");
@@ -59,6 +71,12 @@ public class TcpForwardClient {
             byte[] allArrays = buffer.array();
             byte[] realArrays = new byte[0];
             if(read == -1) {
+                try {
+                    socketChannel.close();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    return;
+                }
             } else {
                 realArrays = new byte[read];
                 System.arraycopy(allArrays, 0, realArrays, 0, read);

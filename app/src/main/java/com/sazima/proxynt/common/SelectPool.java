@@ -21,18 +21,16 @@ public class SelectPool {
     public void run() throws IOException {
         Log.i("select", "start select");
         while (selector.isOpen()) {
-//            while (true) {
+            try {
                 selector.select(1);
                 Set<SelectionKey> selectedKeys = selector.selectedKeys();
                 Iterator<SelectionKey> iter = selectedKeys.iterator();
                 while (iter.hasNext()) {
                     SelectionKey key = iter.next();
                     int interestOps = key.interestOps();
-//                    System.out.println(interestOps);
                     if (!key.isReadable()) {
                         continue;
                     }
-//                    ByteBuffer buffer = ByteBuffer.allocate(256);
                     SocketChannel client = (SocketChannel) key.channel();
                     tcpForwardClient.processMessage(client);
 //                    client.read(buffer);
@@ -41,7 +39,9 @@ public class SelectPool {
 //                    buffer.clear();
                     iter.remove();
                 }
-//            }
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
         }
     }
     public void open() throws IOException {

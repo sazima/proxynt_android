@@ -1,15 +1,17 @@
 package com.sazima.proxynt;
 
+import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
+
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.databinding.tool.util.StringUtils;
+import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.Message;
-import android.util.Log;
+import android.os.PowerManager;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -18,7 +20,6 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.Toast;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
@@ -27,7 +28,6 @@ import androidx.navigation.Navigation;
 import androidx.navigation.ui.AppBarConfiguration;
 import androidx.navigation.ui.NavigationUI;
 
-import com.android.tools.r8.code.AputBoolean;
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
 import com.sazima.proxynt.common.SeriallizerUtils;
@@ -36,7 +36,6 @@ import com.sazima.proxynt.common.YourService;
 import com.sazima.proxynt.databinding.ActivityMainBinding;
 import com.sazima.proxynt.entity.ClientConfigEntity;
 
-import java.net.MalformedURLException;
 import java.net.URI;
 
 public class MainActivity extends AppCompatActivity {
@@ -44,7 +43,9 @@ public class MainActivity extends AppCompatActivity {
     private AppBarConfiguration appBarConfiguration;
     private ActivityMainBinding binding;
     JWebSocketClient client;
-    private final String jsonkey = "c_json";
+    private final String JSONKEY = "c_json";
+    private final String DON_NOT_REQUES_TBATTERY = "donNotRequestBattery";
+    private final String DON_NOT_REQUES_TBATTERY_VALUE = "DON_NOT_REQUES_TBATTERY_VALUE";
     private boolean isConnectButton = true;
 
 
@@ -56,6 +57,11 @@ public class MainActivity extends AppCompatActivity {
         startService(new Intent(this, YourService.class));
 
         MyHandler.mainActivity = this;
+        try {
+            requestBattery();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
         binding = ActivityMainBinding.inflate(getLayoutInflater());
         setContentView(binding.getRoot());
@@ -64,7 +70,7 @@ public class MainActivity extends AppCompatActivity {
         appBarConfiguration = new AppBarConfiguration.Builder(navController.getGraph()).build();
         NavigationUI.setupActionBarWithNavController(this, navController, appBarConfiguration);
 
-        String oldJson = readString(jsonkey);
+        String oldJson = readString(JSONKEY);
         EditText textArea = (EditText) findViewById(R.id.jsonTextArea);
         textArea.setText(oldJson);
 
@@ -99,7 +105,7 @@ public class MainActivity extends AppCompatActivity {
                     mButton.setEnabled(true);
                     return;
                 }
-                writeString(jsonkey, jsonString);
+                writeString(JSONKEY, jsonString);
 //                mButton.setText("disconnect");
                 String url = "";
                 ClientConfigEntity.Server server = clientConfigEntity.getServer();
@@ -217,5 +223,51 @@ public class MainActivity extends AppCompatActivity {
         Button mButton = (Button) findViewById(R.id.button_first);
         isConnectButton = true;
         mButton.setText("连接");
+    }
+
+    /**
+     * 电池策略设置成无限制
+     */
+    public void requestBattery(){
+        if (readString(DON_NOT_REQUES_TBATTERY).equals(DON_NOT_REQUES_TBATTERY_VALUE) ){
+            return;
+        }
+        String msg = "将电池策略设置成无限制, 以便不被后台清理";
+        Context context = getApplicationContext();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            String packageName = context.getPackageName();
+            PowerManager pm = (PowerManager) context.getSystemService(Context.POWER_SERVICE);
+            if (!pm.isIgnoringBatteryOptimizations(packageName)) {
+                AlertDialog dialog = new AlertDialog.Builder(this)
+                        .setMessage(msg)//设置要显示的内容
+                        .setNegativeButton("取消", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialogInterface, int i) {
+                                Toast.makeText(MainActivity.this, "跳过", Toast.LENGTH_SHORT).show();
+                                dialogInterface.dismiss();//销毁对话框
+                            }
+                        })
+                        .setNeutralButton("不再提示", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialogInterface, int i) {
+                                // todo
+                                Toast.makeText(MainActivity.this, "跳过", Toast.LENGTH_SHORT).show();
+                                dialogInterface.dismiss();//销毁对话框
+                                writeString(DON_NOT_REQUES_TBATTERY, DON_NOT_REQUES_TBATTERY_VALUE);
+                            }
+                        })
+                        .setPositiveButton("确定", new DialogInterface.OnClickListener() {
+                            @Override
+                            public void onClick(DialogInterface dialog, int which) {
+                                Intent intent = new Intent();
+                                intent.setAction(android.provider.Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                                intent.setFlags(FLAG_ACTIVITY_NEW_TASK);
+                                intent.setData(Uri.parse("package:" + packageName));
+                                context.startActivity(intent);
+                            }
+                        }).create();//create（）方法创建对话框
+                dialog.show();//显示对话框
+            }
+        }
     }
 }

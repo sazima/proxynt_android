@@ -122,6 +122,7 @@ public class JWebSocketClient extends WebSocketClient {
 
     @Override
     public void onClose(int code, String reason, boolean remote) {
+        tcpForwardClient.stop();
         Log.e("JWebSocketClient", "onClose()");
         Message message = new Message();
         message.what = MyHandler.ON_CLOSE_WEBSOCKET;
