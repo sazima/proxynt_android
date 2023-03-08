@@ -1,10 +1,11 @@
-####   proxynt 安卓客户端
+本仓库是内网穿透工具 proxynt 的安卓客户端, 功能正在完善中
  
-前往Releases页面下载: https://github.com/sazima/proxynt_android/releases/tag/0.0.1
+前往Releases页面下载安装包: https://github.com/sazima/proxynt_android/releases/tag/0.0.1
 
-####  功能正在开发中
 
-#### proxynt 仓库: https://github.com/sazima/proxynt
+
+#### proxynt 介绍: https://github.com/sazima/proxynt
+
 
 
 
