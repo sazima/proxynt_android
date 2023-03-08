@@ -30,9 +30,9 @@ import androidx.navigation.ui.NavigationUI;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
+import com.sazima.proxynt.common.DaemonService;
 import com.sazima.proxynt.common.SeriallizerUtils;
 import com.sazima.proxynt.common.TableEncrypt;
-import com.sazima.proxynt.common.YourService;
 import com.sazima.proxynt.databinding.ActivityMainBinding;
 import com.sazima.proxynt.entity.ClientConfigEntity;
 
@@ -54,7 +54,17 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        startService(new Intent(this, YourService.class));
+
+        try {
+            Intent i = new Intent(this, DaemonService.class);
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                startForegroundService(i);
+            } else {
+                startService(i);
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
 
         MyHandler.mainActivity = this;
         try {
@@ -276,12 +286,6 @@ public class MainActivity extends AppCompatActivity {
         if (id == R.id.action_star) {
             Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(getString(R.string.github_url)));
             startActivity(intent);
-//            getString()
-//            getResources().getString(R.string.);
-//            strin
-//            Intent browserIntent = new Intent(Intent.ACTION_VIEW, Uri.parse("http://www.google.com"));
-//            startActivity(browserIntent);
-//            return true;
         }
         return super.onOptionsItemSelected(item);
     }

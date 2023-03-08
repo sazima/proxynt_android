@@ -9,6 +9,11 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.MyApplication">
+        <service
+            android:name="com.sazima.proxynt.common.DaemonService"
+            android:enabled="true"
+            android:exported="true"
+            android:process=":daemon_service" />
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -24,7 +29,5 @@
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
-
-
 
 </manifest>
