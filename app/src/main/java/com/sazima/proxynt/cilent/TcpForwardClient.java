@@ -62,6 +62,16 @@ public class TcpForwardClient {
         isOpen = true;
         return true;
     }
+    public void closeSocket(SocketChannel socketChannel) {
+        if (socketToUid.containsKey(socketChannel)) {
+            socketToUid.remove(socketChannel);
+            try {
+                socketChannel.close();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+        }
+    }
 
     public void processMessage(SocketChannel socketChannel) {
         try {
@@ -69,20 +79,18 @@ public class TcpForwardClient {
             int read = socketChannel.read(buffer);
             Log.i("tcp forarwd", "size : " + read);
             byte[] allArrays = buffer.array();
+            ByteBuffer uidBuffer = socketToUid.get(socketChannel);
             byte[] realArrays = new byte[0];
             if(read == -1) {
-                try {
-                    socketChannel.close();
-                } catch (Exception e) {
-                    e.printStackTrace();
-                    return;
-                }
             } else {
                 realArrays = new byte[read];
                 System.arraycopy(allArrays, 0, realArrays, 0, read);
             }
             TcpOverWebsocketMessage tcpOverWebsocketMessage = new TcpOverWebsocketMessage();
-            ByteBuffer uidBuffer = socketToUid.get(socketChannel);
+            if (null == uidBuffer) {
+                Log.i("tcp forarwd", "uid is null");
+                return;
+            }
             String name = uidToName.get(uidBuffer);
 
             tcpOverWebsocketMessage.setUid(uidBuffer.array());
@@ -95,6 +103,9 @@ public class TcpForwardClient {
             byte[] sendBytes = new SeriallizerUtils().dumps(messageMessageEntity);
             webSocketClient.send(sendBytes);
             Log.i("tcp forarwd", "send to websocket, len: " + sendBytes.length);
+            if (read == 1) {
+                closeSocket(socketChannel);
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -129,23 +140,28 @@ public class TcpForwardClient {
         if (socketChannel == null) {
             Log.e("tcpforward", "socketChannel is null");
         }
-        if (msg.array().length == 0) {
-            socketChannel.close();
-            return true;
-        }
-        if (null == msg) {
-            Log.e("tcpforward", "msg is null");
-            return false;
-        }
+        int len = msg.array().length;
+//        if (len == 0) {
+//            socketChannel.close();
+//            return true;
+//        }
+//        if (null == msg) {
+//            Log.e("tcpforward", "msg is null");
+//            return false;
+//        }
         try {
             socketChannel.write(msg);
-            Log.i("tcpforwrad", "send to success, len: " + msg.array().length);
+            if (len == 0) {
+                Log.i("tcpforwrad", "close, len: " + msg.array().length);
+                closeSocket(socketChannel);
+            }
+//            }
+            Log.i("tcpforwrad", "send to success, len: " + len);
             return true;
         } catch (IOException e) {
             e.printStackTrace();
             return false;
         } catch (NullPointerException e) {
-
             e.printStackTrace();
             return false;
         }

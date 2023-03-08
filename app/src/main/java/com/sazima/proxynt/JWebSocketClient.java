@@ -108,6 +108,7 @@ public class JWebSocketClient extends WebSocketClient {
                     if (data1.getData() == null) {
                         Log.e("e", "data1 is null");
                     }
+                    tcpForwardClient.createSocket(data1.getName(), data1.getUid(), data1.getIp_port());
                     tcpForwardClient.sendByUid( data1.getUid(), ByteBuffer.wrap(data1.getData()));
                     break;
             }
