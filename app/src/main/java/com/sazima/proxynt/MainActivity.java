@@ -2,16 +2,20 @@ package com.sazima.proxynt;
 
 import static android.content.Intent.FLAG_ACTIVITY_NEW_TASK;
 
+import android.content.ComponentName;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.content.Intent;
+import android.content.ServiceConnection;
 import android.content.SharedPreferences;
 import android.databinding.tool.util.StringUtils;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.os.IBinder;
 import android.os.Message;
 import android.os.PowerManager;
+import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -35,6 +39,7 @@ import com.sazima.proxynt.common.SeriallizerUtils;
 import com.sazima.proxynt.common.TableEncrypt;
 import com.sazima.proxynt.databinding.ActivityMainBinding;
 import com.sazima.proxynt.entity.ClientConfigEntity;
+import com.sazima.proxynt.service.JWebSocketClientService;
 
 import java.net.URI;
 
@@ -42,11 +47,15 @@ public class MainActivity extends AppCompatActivity {
 
     private AppBarConfiguration appBarConfiguration;
     private ActivityMainBinding binding;
-    JWebSocketClient client;
+//    JWebSocketClient client;
     private final String JSONKEY = "c_json";
     private final String DON_NOT_REQUES_TBATTERY = "donNotRequestBattery";
     private final String DON_NOT_REQUES_TBATTERY_VALUE = "DON_NOT_REQUES_TBATTERY_VALUE";
     private boolean isConnectButton = true;
+    private JWebSocketClient client;
+    private InnerServiceConnection serviceConnection = new InnerServiceConnection();
+    private JWebSocketClientService.InnerIBinder binder;
+    private JWebSocketClientService jWebSClientService;
 
 
 
@@ -54,17 +63,6 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-
-        try {
-            Intent i = new Intent(this, DaemonService.class);
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                startForegroundService(i);
-            } else {
-                startService(i);
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
 
         MyHandler.mainActivity = this;
         try {
@@ -101,6 +99,7 @@ public class MainActivity extends AppCompatActivity {
                     Message message = new Message();
                     message.what = MyHandler.ON_CLICK_DISCONNECT;
                     MyHandler.handler.sendMessage(message);
+                    unbindService();
                     return;
                 }
                 EditText jsonTextArea = (EditText) findViewById(R.id.jsonTextArea);
@@ -120,19 +119,27 @@ public class MainActivity extends AppCompatActivity {
                     mButton.setEnabled(true);
                     return;
                 }
-                writeString(JSONKEY, jsonString);
-//                mButton.setText("disconnect");
-                String url = "";
-                ClientConfigEntity.Server server = clientConfigEntity.getServer();
-                url += server.isHttps() ? "wss://" : "ws://";
-                url += server.getHost() + ":" + server.getPort() + server.getPath();
-                new TableEncrypt().initTable(server.getPassword());
-                SeriallizerUtils.key = server.getPassword();//# todo?
-                URI uri = URI.create(url);
-                Thread1 t = new Thread1();
-                t.uri = uri;
-                t.clientConfigEntity = clientConfigEntity;
-                new Thread(t).start();
+                try {
+                    writeString(JSONKEY, jsonString);
+                    String url = "";
+                    ClientConfigEntity.Server server = clientConfigEntity.getServer();
+                    url += server.isHttps() ? "wss://" : "ws://";
+                    url += server.getHost() + ":" + server.getPort() + server.getPath();
+                    TableEncrypt.initTable(server.getPassword());
+                    SeriallizerUtils.key = server.getPassword();//# todo?
+                    URI uri = URI.create(url);
+                    JWebSocketClientService.clientConfigEntity = clientConfigEntity;
+                    JWebSocketClientService.uri = uri;
+                    //启动service
+                    startJWebSClientService();
+                    //绑定服务
+                    bindService();
+                } catch (Exception e) {
+                    e.printStackTrace();
+                    showDialog("请检查json配置" + e.getMessage(), "错误");
+                    mButton.setEnabled(true);
+                    return;
+                }
                 return;
             }
 
@@ -178,38 +185,6 @@ public class MainActivity extends AppCompatActivity {
     /*
     websocket
      */
-    class Thread1 implements Runnable {
-        public URI uri;
-        public ClientConfigEntity clientConfigEntity;
-
-        @RequiresApi(api = Build.VERSION_CODES.N)
-        public synchronized void run() {
-            client = new JWebSocketClient(uri, clientConfigEntity);
-            MyHandler.jWebSocketClient = client;
-            try {
-                client.connectBlocking();
-            } catch (Exception e) {
-                Message message = new Message();
-                message.what = MyHandler.ON_WEBSOCKETCONNECT_ERROR;
-                message.obj = e.getMessage();
-                MyHandler.handler.sendMessage(message);
-                return;
-            }
-            if (!client.isOpen()) {
-                Message message = new Message();
-                message.what = MyHandler.ON_WEBSOCKETCONNECT_ERROR;
-                message.obj = "client is not open";
-                MyHandler.handler.sendMessage(message);
-                return;
-            } else {
-                Message message = new Message();
-                message.what = MyHandler.ON_WEBSOCKETCONNECT_SUCCESS;
-                message.obj = "连接成功";
-                MyHandler.handler.sendMessage(message);
-            }
-//            connectOtherThread(uri, clientConfigEntity);
-        }
-    }
 
 
     public void writeString(String KEY, String content) {
@@ -288,5 +263,38 @@ public class MainActivity extends AppCompatActivity {
             startActivity(intent);
         }
         return super.onOptionsItemSelected(item);
+    }
+    private void startJWebSClientService() {
+        Context mContext = getApplicationContext();
+        Intent intent = new Intent(mContext, JWebSocketClientService.class);
+        startService(intent);
+    }
+    private void bindService() {
+        Intent bindIntent = new Intent(this, JWebSocketClientService.class);
+        bindService(bindIntent, serviceConnection, BIND_AUTO_CREATE);
+    }
+
+    private void unbindService(){
+        unbindService(serviceConnection);
+    }
+
+
+    private class InnerServiceConnection implements ServiceConnection {
+
+        @Override
+        public void onServiceConnected(ComponentName name, IBinder service) {
+            Log.d("Service","onServiceConnected()->当Activity和Service连接");
+//            LocalBinder binder = (LocalBinder) service;
+//            service = (IBinder) binder.getService();
+            binder = (JWebSocketClientService.InnerIBinder) service;
+//            binder = (JWebSocketClientService.InnerIBinder) service;
+            jWebSClientService = binder.getService();
+            client = jWebSClientService.client;
+        }
+
+        @Override
+        public void onServiceDisconnected(ComponentName name) {
+            Log.d("Service","onServiceConnected()->当Activity和Service断开连接");
+        }
     }
 }

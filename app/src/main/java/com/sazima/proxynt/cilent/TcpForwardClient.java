@@ -18,6 +18,7 @@ import java.security.NoSuchAlgorithmException;
 import java.util.HashMap;
 
 public class TcpForwardClient {
+    private final String TAG = "TcpForwardClient";
     private HashMap<ByteBuffer, SocketChannel> uidToSocket = new HashMap<>();
     private HashMap<SocketChannel, ByteBuffer> socketToUid = new HashMap<>();
     private HashMap<ByteBuffer, String> uidToName = new HashMap<>();
@@ -77,7 +78,6 @@ public class TcpForwardClient {
         try {
             ByteBuffer buffer = ByteBuffer.allocate(10240);
             int read = socketChannel.read(buffer);
-            Log.i("tcp forarwd", "size : " + read);
             byte[] allArrays = buffer.array();
             ByteBuffer uidBuffer = socketToUid.get(socketChannel);
             byte[] realArrays = new byte[0];
@@ -88,7 +88,7 @@ public class TcpForwardClient {
             }
             TcpOverWebsocketMessage tcpOverWebsocketMessage = new TcpOverWebsocketMessage();
             if (null == uidBuffer) {
-                Log.i("tcp forarwd", "uid is null");
+                Log.i(TAG, "uid is null");
                 return;
             }
             String name = uidToName.get(uidBuffer);
@@ -102,8 +102,8 @@ public class TcpForwardClient {
             messageMessageEntity.setType_(MessageTypeConstant.WEBSOCKET_OVER_TCP);
             byte[] sendBytes = new SeriallizerUtils().dumps(messageMessageEntity);
             webSocketClient.send(sendBytes);
-            Log.i("tcp forarwd", "send to websocket, len: " + sendBytes.length);
-            if (read == 1) {
+            Log.i(TAG, "send to websocket, len: " + sendBytes.length);
+            if (read == -1) {
                 closeSocket(socketChannel);
             }
         } catch (Exception e) {

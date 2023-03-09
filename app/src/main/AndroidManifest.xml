@@ -10,10 +10,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.MyApplication">
         <service
-            android:name="com.sazima.proxynt.common.DaemonService"
+            android:name="com.sazima.proxynt.service.JWebSocketClientService"
             android:enabled="true"
             android:exported="true"
-            android:process=":daemon_service" />
+            />
         <activity
             android:name=".MainActivity"
             android:exported="true"

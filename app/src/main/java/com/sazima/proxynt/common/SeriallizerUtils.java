@@ -32,7 +32,7 @@ public class SeriallizerUtils {
 
     @RequiresApi(api = Build.VERSION_CODES.O)
     public MessageEntity loads(byte[] bytes) throws NoSuchAlgorithmException, IOException {
-        bytes = new EncryptUtils().decrypt(bytes);
+        bytes = EncryptUtils.decrypt(bytes);
         byte[] type = new byte[1];
         byte[] bodyLen = new byte[4];
         System.arraycopy(bytes, 0, type, 0, 1);
@@ -147,10 +147,7 @@ public class SeriallizerUtils {
         needSashSteam.write(timestamp);
         needSashSteam.write(bodyPrefix);
         needSashSteam.write(key.getBytes());
-//        signature = EncryptUtils.md5_hash(nonce + timestamp + body[:12] + key.getBytes()
         byte[] hash = getMd5(needSashSteam.toByteArray());
-//        new EncryptUtils().
-//                k
         returnMessage.write(hash);
         returnMessage.write(empty);
         returnMessage.write(body);
@@ -158,7 +155,7 @@ public class SeriallizerUtils {
         Log.i("encrypt", "start encrypt");
         try {
 //            byte[] bytes = new EncryptUtils().encrypt("hello world".getBytes());
-            byte[] bytes = new EncryptUtils().encrypt(returnMessage.toByteArray());
+            byte[] bytes = EncryptUtils.encrypt(returnMessage.toByteArray());
             System.out.printf(String.valueOf(bytes));
             Log.i("encrypt", "end encrypt");
             return bytes;
