@@ -1,5 +1,7 @@
 <resources>
     <string name="app_name">proxynt</string>
+
+    <string name="scan">扫码</string>
     <string name="action_star">Star</string>
     <!-- Strings used for fragments for navigation -->
     <string name="first_fragment_label">proxynt</string>

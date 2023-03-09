@@ -9,6 +9,8 @@ import androidx.annotation.NonNull;
 
 import com.google.android.material.snackbar.Snackbar;
 
+import java.util.concurrent.TimeUnit;
+
 public class MyHandler {
     public static MainActivity mainActivity;
     public static  JWebSocketClient jWebSocketClient;
@@ -36,6 +38,7 @@ public class MyHandler {
                     mainActivity.showDialog(content, "连接服务器错误");
 //                    Toast.makeText(mainActivity, "点击了确定的按钮", Toast.LENGTH_SHORT).show();
                     mButton.setEnabled(true);
+                    mainActivity.unbindService();
                     break;
                 case ON_WEBSOCKETCONNECT_SUCCESS:
                     String content1 = (String) msg.obj;
@@ -56,8 +59,13 @@ public class MyHandler {
                 case ON_CLICK_DISCONNECT:
                     Toast.makeText(mainActivity, "close", Toast.LENGTH_SHORT).show();
                     websocketRunning = false;
-                    jWebSocketClient.close();
+                    try {
+                        jWebSocketClient.closeBlocking();
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
                     mainActivity.setButtonToConnect();
+                    mainActivity.unbindService();
                     mButton.setEnabled(true);
                     break;
                 case ON_WEBSOCKET_OPEN:

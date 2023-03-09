@@ -16,6 +16,7 @@ import com.sazima.proxynt.MyHandler;
 import com.sazima.proxynt.entity.ClientConfigEntity;
 
 import java.net.URI;
+import java.util.concurrent.TimeUnit;
 
 public class JWebSocketClientService extends Service {
     private final String TAG = "JWebSocketClientService";
@@ -31,6 +32,7 @@ public class JWebSocketClientService extends Service {
         Log.i(TAG, "on bind");
         return mBinder;
     }
+
 
     public class InnerIBinder extends Binder {
         public JWebSocketClientService getService() {
@@ -53,9 +55,15 @@ public class JWebSocketClientService extends Service {
     @Override
     public void onDestroy() {
 //        closeConnect(); // todo close
+        Log.i(TAG,"onDestroy" );
         super.onDestroy();
     }
 
+    @Override
+    public boolean onUnbind(Intent intent) {
+        Log.i(TAG,"onUnbind---------------" );
+        return super.onUnbind(intent);
+    }
 
     private void initSocketClient() {
         Thread1 t = new Thread1();
@@ -79,7 +87,7 @@ public class JWebSocketClientService extends Service {
                 return;
             }
             try {
-                client.connectBlocking();
+                client.connectBlocking(5, TimeUnit.SECONDS);
             } catch (Exception e) {
                 Message message = new Message();
                 message.what = MyHandler.ON_WEBSOCKETCONNECT_ERROR;

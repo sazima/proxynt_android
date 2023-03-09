@@ -34,6 +34,8 @@ import androidx.navigation.ui.NavigationUI;
 
 import com.google.gson.Gson;
 import com.google.gson.JsonSyntaxException;
+import com.google.zxing.integration.android.IntentIntegrator;
+import com.google.zxing.integration.android.IntentResult;
 import com.sazima.proxynt.common.DaemonService;
 import com.sazima.proxynt.common.SeriallizerUtils;
 import com.sazima.proxynt.common.TableEncrypt;
@@ -42,8 +44,11 @@ import com.sazima.proxynt.entity.ClientConfigEntity;
 import com.sazima.proxynt.service.JWebSocketClientService;
 
 import java.net.URI;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 
 public class MainActivity extends AppCompatActivity {
+    private final String TAG = "MainActivity";
 
     private AppBarConfiguration appBarConfiguration;
     private ActivityMainBinding binding;
@@ -56,6 +61,9 @@ public class MainActivity extends AppCompatActivity {
     private InnerServiceConnection serviceConnection = new InnerServiceConnection();
     private JWebSocketClientService.InnerIBinder binder;
     private JWebSocketClientService jWebSClientService;
+
+    private Lock lock=new ReentrantLock();
+
 
 
 
@@ -91,54 +99,64 @@ public class MainActivity extends AppCompatActivity {
 
             @Override
             public void onClick(View view) {
-                Button mButton = (Button) findViewById(R.id.button_first);
-                mButton.setEnabled(false);
-                InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
-                imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
-                if (!isConnectButton) {
-                    Message message = new Message();
-                    message.what = MyHandler.ON_CLICK_DISCONNECT;
-                    MyHandler.handler.sendMessage(message);
-                    unbindService();
-                    return;
-                }
-                EditText jsonTextArea = (EditText) findViewById(R.id.jsonTextArea);
-                String jsonString = jsonTextArea.getText().toString();
-                if (!StringUtils.isNotBlank(jsonString)) {
-                    showDialog("请输入配置json", "错误");
-                    mButton.setEnabled(true);
-                    return;
-                }
-                ClientConfigEntity clientConfigEntity;
-                Gson gson = new Gson();
-                try {
-                    clientConfigEntity = gson.fromJson(jsonString, ClientConfigEntity.class);
-                } catch (JsonSyntaxException e) {
-                    e.printStackTrace();
-                    showDialog("请检查json格式", "错误");
-                    mButton.setEnabled(true);
+                if (!lock.tryLock()) {
+                    Log.i(TAG, "点击过快, 跳过");
                     return;
                 }
                 try {
-                    writeString(JSONKEY, jsonString);
-                    String url = "";
-                    ClientConfigEntity.Server server = clientConfigEntity.getServer();
-                    url += server.isHttps() ? "wss://" : "ws://";
-                    url += server.getHost() + ":" + server.getPort() + server.getPath();
-                    TableEncrypt.initTable(server.getPassword());
-                    SeriallizerUtils.key = server.getPassword();//# todo?
-                    URI uri = URI.create(url);
-                    JWebSocketClientService.clientConfigEntity = clientConfigEntity;
-                    JWebSocketClientService.uri = uri;
-                    //启动service
-                    startJWebSClientService();
-                    //绑定服务
-                    bindService();
+                    Button mButton = (Button) findViewById(R.id.button_first);
+                    mButton.setEnabled(false);
+                    InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
+                    imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
+                    if (!isConnectButton) {
+                        Message message = new Message();
+                        message.what = MyHandler.ON_CLICK_DISCONNECT;
+                        MyHandler.handler.sendMessage(message);
+                        return;
+                    }
+                    EditText jsonTextArea = (EditText) findViewById(R.id.jsonTextArea);
+                    String jsonString = jsonTextArea.getText().toString();
+                    if (!StringUtils.isNotBlank(jsonString)) {
+                        showDialog("请输入配置json", "错误");
+                        mButton.setEnabled(true);
+                        return;
+                    }
+                    ClientConfigEntity clientConfigEntity;
+                    Gson gson = new Gson();
+                    try {
+                        clientConfigEntity = gson.fromJson(jsonString, ClientConfigEntity.class);
+                    } catch (JsonSyntaxException e) {
+                        e.printStackTrace();
+                        showDialog("请检查json格式", "错误");
+                        mButton.setEnabled(true);
+                        return;
+                    }
+                    try {
+                        writeString(JSONKEY, jsonString);
+                        String url = "";
+                        ClientConfigEntity.Server server = clientConfigEntity.getServer();
+                        url += server.isHttps() ? "wss://" : "ws://";
+                        url += server.getHost() + ":" + server.getPort() + server.getPath();
+                        TableEncrypt.initTable(server.getPassword());
+                        SeriallizerUtils.key = server.getPassword();//# todo?
+                        URI uri = URI.create(url);
+                        JWebSocketClientService.clientConfigEntity = clientConfigEntity;
+                        JWebSocketClientService.uri = uri;
+                        //启动service
+                        startJWebSClientService();
+                        //绑定服务
+                        bindService();
+                    } catch (Exception e) {
+                        e.printStackTrace();
+                        showDialog("请检查json配置" + e.getMessage(), "错误");
+                        mButton.setEnabled(true);
+                        return;
+                    }
+
                 } catch (Exception e) {
                     e.printStackTrace();
-                    showDialog("请检查json配置" + e.getMessage(), "错误");
-                    mButton.setEnabled(true);
-                    return;
+                } finally {
+                    lock.unlock();
                 }
                 return;
             }
@@ -261,9 +279,33 @@ public class MainActivity extends AppCompatActivity {
         if (id == R.id.action_star) {
             Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(getString(R.string.github_url)));
             startActivity(intent);
+        } else if (id == R.id.scan) {
+            // 创建IntentIntegrator对象
+            IntentIntegrator intentIntegrator = new IntentIntegrator(MainActivity.this);
+            // 开始扫描
+            intentIntegrator.initiateScan();
+
         }
         return super.onOptionsItemSelected(item);
     }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        // 获取解析结果
+        IntentResult result = IntentIntegrator.parseActivityResult(requestCode, resultCode, data);
+        if (result != null) {
+            if (result.getContents() == null) {
+                Toast.makeText(this, "取消扫描", Toast.LENGTH_LONG).show();
+            } else {
+//                Toast.makeText(this, "扫描内容:" + result.getContents(), Toast.LENGTH_LONG).show();
+                EditText textArea = (EditText) findViewById(R.id.jsonTextArea);
+                textArea.setText(result.getContents());
+            }
+        } else {
+            super.onActivityResult(requestCode, resultCode, data);
+        }
+    }
+
     private void startJWebSClientService() {
         Context mContext = getApplicationContext();
         Intent intent = new Intent(mContext, JWebSocketClientService.class);
@@ -274,7 +316,7 @@ public class MainActivity extends AppCompatActivity {
         bindService(bindIntent, serviceConnection, BIND_AUTO_CREATE);
     }
 
-    private void unbindService(){
+    public void unbindService(){
         unbindService(serviceConnection);
     }
 

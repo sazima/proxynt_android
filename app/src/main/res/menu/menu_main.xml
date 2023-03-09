@@ -3,6 +3,11 @@
     xmlns:tools="http://schemas.android.com/tools"
     tools:context="com.sazima.proxynt.MainActivity">
     <item
+        android:id="@+id/scan"
+        android:orderInCategory="100"
+        android:title="@string/scan"
+        app:showAsAction="never" />
+    <item
         android:id="@+id/action_star"
         android:orderInCategory="100"
         android:title="@string/action_star"
