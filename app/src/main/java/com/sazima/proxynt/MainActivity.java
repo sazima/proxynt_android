@@ -18,6 +18,7 @@ import android.os.PowerManager;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.Button;
@@ -52,7 +53,7 @@ public class MainActivity extends AppCompatActivity {
 
     private AppBarConfiguration appBarConfiguration;
     private ActivityMainBinding binding;
-//    JWebSocketClient client;
+    //    JWebSocketClient client;
     private final String JSONKEY = "c_json";
     private final String DON_NOT_REQUES_TBATTERY = "donNotRequestBattery";
     private final String DON_NOT_REQUES_TBATTERY_VALUE = "DON_NOT_REQUES_TBATTERY_VALUE";
@@ -62,9 +63,7 @@ public class MainActivity extends AppCompatActivity {
     private JWebSocketClientService.InnerIBinder binder;
     private JWebSocketClientService jWebSClientService;
 
-    private Lock lock=new ReentrantLock();
-
-
+    private Lock lock = new ReentrantLock();
 
 
     @RequiresApi(api = Build.VERSION_CODES.N)
@@ -106,8 +105,6 @@ public class MainActivity extends AppCompatActivity {
                 try {
                     Button mButton = (Button) findViewById(R.id.button_first);
                     mButton.setEnabled(false);
-                    InputMethodManager imm = (InputMethodManager)getSystemService(Context.INPUT_METHOD_SERVICE);
-                    imm.hideSoftInputFromWindow(view.getWindowToken(), 0);
                     if (!isConnectButton) {
                         Message message = new Message();
                         message.what = MyHandler.ON_CLICK_DISCONNECT;
@@ -179,6 +176,16 @@ public class MainActivity extends AppCompatActivity {
                 || super.onSupportNavigateUp();
     }
 
+    @Override
+    protected void onResume() {
+        Log.i(TAG, "onResume");
+        Message message0 = new Message();
+        message0.what = MyHandler.HEATBEAT;
+        MyHandler.handler.sendMessage(message0);
+        super.onResume();
+    }
+
+
     public void showDialog(String msg, String title) {
         AlertDialog dialog = new AlertDialog.Builder(this)
                 .setTitle(title)//设置标题
@@ -217,11 +224,13 @@ public class MainActivity extends AppCompatActivity {
         String homeScore = settings.getString("homeScore", "");
         return homeScore;
     }
+
     public void setButtonToClose() {
         Button mButton = (Button) findViewById(R.id.button_first);
         isConnectButton = false;
         mButton.setText("断开");
     }
+
     public void setButtonToConnect() {
         Button mButton = (Button) findViewById(R.id.button_first);
         isConnectButton = true;
@@ -231,8 +240,8 @@ public class MainActivity extends AppCompatActivity {
     /**
      * 电池策略设置成无限制
      */
-    public void requestBattery(){
-        if (readString(DON_NOT_REQUES_TBATTERY).equals(DON_NOT_REQUES_TBATTERY_VALUE) ){
+    public void requestBattery() {
+        if (readString(DON_NOT_REQUES_TBATTERY).equals(DON_NOT_REQUES_TBATTERY_VALUE)) {
             return;
         }
         String msg = "将电池策略设置成无限制, 以便不被后台清理";
@@ -273,6 +282,7 @@ public class MainActivity extends AppCompatActivity {
             }
         }
     }
+
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         int id = item.getItemId();
@@ -311,12 +321,13 @@ public class MainActivity extends AppCompatActivity {
         Intent intent = new Intent(mContext, JWebSocketClientService.class);
         startService(intent);
     }
+
     private void bindService() {
         Intent bindIntent = new Intent(this, JWebSocketClientService.class);
         bindService(bindIntent, serviceConnection, BIND_AUTO_CREATE);
     }
 
-    public void unbindService(){
+    public void unbindService() {
         unbindService(serviceConnection);
     }
 
@@ -325,18 +336,59 @@ public class MainActivity extends AppCompatActivity {
 
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
-            Log.d("Service","onServiceConnected()->当Activity和Service连接");
-//            LocalBinder binder = (LocalBinder) service;
-//            service = (IBinder) binder.getService();
+            Log.d("Service", "onServiceConnected()->当Activity和Service连接");
             binder = (JWebSocketClientService.InnerIBinder) service;
-//            binder = (JWebSocketClientService.InnerIBinder) service;
             jWebSClientService = binder.getService();
             client = jWebSClientService.client;
         }
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
-            Log.d("Service","onServiceConnected()->当Activity和Service断开连接");
+            Log.d("Service", "onServiceConnected()->当Activity和Service断开连接");
         }
+    }
+
+
+    /**
+     * 点击事件
+     *
+     * @param ev
+     * @return
+     */
+    @Override
+    public boolean dispatchTouchEvent(MotionEvent ev) {
+        if (ev.getAction() == MotionEvent.ACTION_DOWN) {
+            //返回具有焦点的当前视图
+            View v = getCurrentFocus();
+            if (isShouldHideInput(v, ev)) {
+                InputMethodManager imm = (InputMethodManager) getSystemService(Context.INPUT_METHOD_SERVICE);
+                if (imm != null) {
+                    imm.hideSoftInputFromWindow(getCurrentFocus().getWindowToken(), 0);
+                }
+            }
+        }
+        return super.dispatchTouchEvent(ev);
+    }
+
+    private boolean isShouldHideInput(View v, MotionEvent ev) {
+        if (v != null) {
+            if (v instanceof EditText) {
+                //命名一个元素为2个的整数数组
+                int[] leftTop = {0, 0};
+                //返回两个整数值,分别为X和Y,此X和Y表示此视图,在其屏幕中的坐标(以左上角为原点的坐标)
+                v.getLocationInWindow(leftTop);
+                int left = leftTop[0],
+                        top = leftTop[1],
+                        bottom = top + v.getHeight(),
+                        right = left + v.getWidth();
+                if (ev.getX() > left && ev.getX() < right && ev.getY() > top && ev.getY() < bottom) {
+                    //如果点击的是输入框的区域,则返回false
+                    return false;
+                } else {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 }

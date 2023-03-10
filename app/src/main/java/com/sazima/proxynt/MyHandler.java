@@ -7,10 +7,6 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 
-import com.google.android.material.snackbar.Snackbar;
-
-import java.util.concurrent.TimeUnit;
-
 public class MyHandler {
     public static MainActivity mainActivity;
     public static  JWebSocketClient jWebSocketClient;
@@ -21,6 +17,7 @@ public class MyHandler {
     public final static int ON_WEBSOCKETCONNECT_SUCCESS = 4;
     public final static int ON_CLICK_DISCONNECT = 5;
     public final static int SEND_MESSAGE = 6;
+    public final static int HEATBEAT = 7;
 
     /*
     如果是true的话, 断开就需要重连
@@ -44,7 +41,6 @@ public class MyHandler {
                     String content1 = (String) msg.obj;
                     Toast.makeText(mainActivity, content1, Toast.LENGTH_SHORT).show();
                     // 变成 disconnect
-//                    mButton.setText("断开");
                     mainActivity.setButtonToClose();
                     websocketRunning = true;
                     mButton.setEnabled(true);
@@ -76,8 +72,14 @@ public class MyHandler {
                     String content3 = (String) msg.obj;
                     Toast.makeText(mainActivity, content3, Toast.LENGTH_SHORT).show();
                     break;
+                case HEATBEAT:
+                    if (websocketRunning) {
+                        mainActivity.setButtonToClose();
+                        websocketRunning = true;
+                        mButton.setEnabled(true);
+                    }
+                    break;
             }
-
         }
     };
 

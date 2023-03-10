@@ -14,7 +14,6 @@ import com.sazima.proxynt.entity.MessageEntity;
 import com.sazima.proxynt.entity.PushConfigEntity;
 import com.sazima.proxynt.entity.TcpOverWebsocketMessage;
 
-import org.java_websocket.WebSocket;
 import org.java_websocket.client.WebSocketClient;
 import org.java_websocket.drafts.Draft_6455;
 import org.java_websocket.handshake.ServerHandshake;
@@ -85,6 +84,9 @@ public class JWebSocketClient extends WebSocketClient {
             switch (messageEntity.getType_()){
                 case MessageTypeConstant.PING:
                     send(array);
+                    Message message0 = new Message();
+                    message0.what = MyHandler.HEATBEAT;
+                    MyHandler.handler.sendMessage(message0);
                     break;
                 case MessageTypeConstant.PUSH_CONFIG:
                     break;
