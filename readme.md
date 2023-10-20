@@ -8,3 +8,21 @@
 
 
 
+配置格式：
+
+
+```json
+{
+  "server": {
+    "port": 80,
+    "host": "192.168.50.1",
+    "https": true,
+    "password": "helloworld",
+    "path": "/websocket_path"
+  },
+  "client_name": "android",
+  "client": [],
+  "log_file": "/var/log/nt/nt.log"
+}
+
+```
